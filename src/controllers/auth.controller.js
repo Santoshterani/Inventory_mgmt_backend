@@ -20,4 +20,23 @@ const me = asyncHandler(async (req, res) => {
   res.json({ user: req.user });
 });
 
-module.exports = { login, logout, me };
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  await authService.changePassword(req.user, currentPassword, newPassword);
+  res.status(204).send();
+});
+
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { username } = req.body;
+  if (!username) throw ApiError.badRequest('username is required.');
+  const result = await authService.forgotPassword(username);
+  res.json(result);
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+  await authService.resetPassword(token, newPassword);
+  res.status(204).send();
+});
+
+module.exports = { login, logout, me, changePassword, forgotPassword, resetPassword };

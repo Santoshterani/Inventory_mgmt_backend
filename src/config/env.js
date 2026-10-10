@@ -25,14 +25,25 @@ module.exports = {
     expiresIn: process.env.JWT_EXPIRES_IN || '8h',
   },
 
-  corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:*')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
 
   bootstrapAdmin: {
     username: process.env.BOOTSTRAP_ADMIN_USERNAME || 'admin',
     password: process.env.BOOTSTRAP_ADMIN_PASSWORD || 'ChangeMe123!',
     name: process.env.BOOTSTRAP_ADMIN_NAME || 'System Administrator',
+    serviceId: process.env.BOOTSTRAP_ADMIN_SERVICE_ID || 'SVC-000001',
+  },
+
+  passwordReset: {
+    tokenExpiryMinutes: parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES || '30', 10),
+  },
+
+  logging: {
+    level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+    dir: process.env.LOG_DIR || 'logs',
   },
 };

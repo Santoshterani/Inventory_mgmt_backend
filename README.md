@@ -36,6 +36,12 @@ npm run db:init            # creates the DB, applies schema.sql + seed.sql,
 npm run dev                 # http://localhost:5000
 ```
 
+`CORS_ORIGIN` is a comma-separated list of allowed origins. For local
+development, `http://localhost:*` allows the frontend's localhost port to vary
+(for example, when Vite selects a port other than 5173). Set `FRONTEND_URL` to
+the frontend's actual origin when configuring the password-reset link; it
+defaults to `http://localhost:5173`.
+
 Bootstrap admin credentials come from `BOOTSTRAP_ADMIN_USERNAME` /
 `BOOTSTRAP_ADMIN_PASSWORD` in `.env` (defaults: `admin` / `ChangeMe123!`).
 Sign in and change the password immediately in a real deployment.

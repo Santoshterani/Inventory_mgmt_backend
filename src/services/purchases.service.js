@@ -46,8 +46,8 @@ async function list(user, { baseId, equipmentTypeId, from, to, page = 1, pageSiz
   return { items: rows, total, bases, equipmentTypes };
 }
 
-async function getById(user, id) {
-  const [rows] = await pool.query(
+async function getById(user, id, executor = pool) {
+  const [rows] = await executor.query(
     `SELECT p.id, p.base_id AS baseId, b.name AS baseName,
             p.equipment_type_id AS equipmentTypeId, et.name AS equipmentTypeName,
             p.quantity, p.purchase_date AS purchaseDate,
@@ -101,7 +101,7 @@ async function create(user, { baseId, equipmentTypeId, quantity, purchaseDate })
       conn
     );
 
-    return getById(user, result.insertId);
+    return getById(user, result.insertId, conn);
   });
 }
 

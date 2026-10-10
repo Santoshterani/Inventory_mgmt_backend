@@ -12,8 +12,9 @@ async function list(user) {
   const params = user.role === 'ADMIN' ? [] : [user.baseId];
 
   const [rows] = await pool.query(
-    `SELECT u.id, u.name, u.username, r.code AS role, u.base_id AS baseId, b.name AS baseName,
-            u.is_active AS isActive, u.created_at AS createdAt
+    `SELECT u.id, u.name, u.username, u.service_id AS serviceId, r.code AS role,
+            u.base_id AS baseId, b.name AS baseName,
+            u.is_active AS isActive, u.must_change_password AS mustChangePassword, u.created_at AS createdAt
      FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN bases b ON b.id = u.base_id
      ${where}
      ORDER BY u.name`,
@@ -21,15 +22,20 @@ async function list(user) {
   );
   const [bases] = await pool.query('SELECT id, name FROM bases WHERE is_active = 1 ORDER BY name');
 
-  return { items: rows.map((r) => ({ ...r, isActive: Boolean(r.isActive) })), bases };
+  return {
+    items: rows.map((r) => ({ ...r, isActive: Boolean(r.isActive), mustChangePassword: Boolean(r.mustChangePassword) })),
+    bases,
+  };
 }
 
 // section 3.4/FR-08: Admins can create any role at any base. A Base
 // Commander may only create users if `can_create_users` is set on their own
 // account, and then only Logistics Officers scoped to their own base.
-async function create(user, { name, username, password, role, baseId }) {
-  if (!name?.trim() || !username?.trim() || !password || password.length < 8 || !role) {
-    throw ApiError.badRequest('name, username, a password of at least 8 characters, and role are required.');
+async function create(user, { name, username, serviceId, password, role, baseId }) {
+  if (!name?.trim() || !username?.trim() || !serviceId?.trim() || !password || password.length < 8 || !role) {
+    throw ApiError.badRequest(
+      'name, username, serviceId, a password of at least 8 characters, and role are required.'
+    );
   }
   if (!ROLE_IDS[role]) throw ApiError.badRequest('Invalid role.');
 
@@ -49,20 +55,23 @@ async function create(user, { name, username, password, role, baseId }) {
 
   const passwordHash = await hashPassword(password);
 
+  // Every admin-issued password is a temporary one: must_change_password
+  // starts TRUE, so the frontend forces a change-password screen on the
+  // new user's first sign-in (see auth.service.js / PATCH /auth/change-password).
   return withTransaction(async (conn) => {
     const [result] = await conn.query(
-      `INSERT INTO users (name, username, password_hash, role_id, base_id, can_create_users, is_active)
-       VALUES (?, ?, ?, ?, ?, 0, 1)`,
-      [name.trim(), username.trim(), passwordHash, ROLE_IDS[role], role === 'ADMIN' ? null : baseId]
+      `INSERT INTO users (name, username, service_id, password_hash, role_id, base_id, can_create_users, is_active, must_change_password)
+       VALUES (?, ?, ?, ?, ?, ?, 0, 1, 1)`,
+      [name.trim(), username.trim(), serviceId.trim(), passwordHash, ROLE_IDS[role], role === 'ADMIN' ? null : baseId]
     );
 
     await auditService.log(
-      { actorId: user.id, action: 'USER_CREATED', entityType: 'user', entityId: result.insertId, details: { username, role, baseId } },
+      { actorId: user.id, action: 'USER_CREATED', entityType: 'user', entityId: result.insertId, details: { username, serviceId, role, baseId } },
       conn
     );
 
     const [[created]] = await conn.query(
-      `SELECT u.id, u.name, u.username, r.code AS role, u.base_id AS baseId, u.is_active AS isActive
+      `SELECT u.id, u.name, u.username, u.service_id AS serviceId, r.code AS role, u.base_id AS baseId, u.is_active AS isActive
        FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?`,
       [result.insertId]
     );

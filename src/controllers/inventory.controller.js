@@ -12,4 +12,9 @@ const list = asyncHandler(async (req, res) => {
   res.json(data);
 });
 
-module.exports = { list };
+const upsert = asyncHandler(async (req, res) => {
+  const result = await inventoryService.upsert(req.user, req.body);
+  res.status(201).json(result);
+});
+
+module.exports = { list, upsert };

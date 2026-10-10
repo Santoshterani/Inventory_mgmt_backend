@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // One-time setup: applies schema.sql and seed.sql against DB_NAME, then
 // creates a bootstrap ADMIN user if none exists yet (section 3.4: accounts
 // are created by an authorized administrator, so something has to create
@@ -8,6 +7,7 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const env = require('../config/env');
+const logger = require('../config/logger');
 
 async function run() {
   const connection = await mysql.createConnection({
@@ -18,18 +18,18 @@ async function run() {
     multipleStatements: true,
   });
 
-  console.log(`Creating database \`${env.db.name}\` if it does not exist…`);
+  logger.info(`Creating database \`${env.db.name}\` if it does not exist…`);
   await connection.query(
     `CREATE DATABASE IF NOT EXISTS \`${env.db.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
   );
   await connection.query(`USE \`${env.db.name}\``);
 
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  console.log('Applying schema.sql…');
+  logger.info('Applying schema.sql…');
   await connection.query(schema);
 
   const seed = fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8');
-  console.log('Applying seed.sql…');
+  logger.info('Applying seed.sql…');
   await connection.query(seed);
 
   const [existingAdmins] = await connection.query(
@@ -38,23 +38,26 @@ async function run() {
 
   if (existingAdmins.length === 0) {
     const passwordHash = await bcrypt.hash(env.bootstrapAdmin.password, 12);
+    // must_change_password = 0 here only because this password was chosen
+    // deliberately via .env, not auto-generated — every other account
+    // created afterwards (via POST /api/users) defaults to 1.
     await connection.query(
-      `INSERT INTO users (name, username, password_hash, role_id, base_id, can_create_users, is_active)
-       VALUES (?, ?, ?, 1, NULL, 1, 1)`,
-      [env.bootstrapAdmin.name, env.bootstrapAdmin.username, passwordHash]
+      `INSERT INTO users (name, username, service_id, password_hash, role_id, base_id, can_create_users, is_active, must_change_password)
+       VALUES (?, ?, ?, ?, 1, NULL, 1, 1, 0)`,
+      [env.bootstrapAdmin.name, env.bootstrapAdmin.username, env.bootstrapAdmin.serviceId, passwordHash]
     );
-    console.log(
+    logger.info(
       `Bootstrap admin created — username: "${env.bootstrapAdmin.username}". Sign in and change the password.`
     );
   } else {
-    console.log('An admin user already exists; skipping bootstrap admin creation.');
+    logger.info('An admin user already exists; skipping bootstrap admin creation.');
   }
 
   await connection.end();
-  console.log('Database initialization complete.');
+  logger.info('Database initialization complete.');
 }
 
 run().catch((err) => {
-  console.error('Database initialization failed:', err);
+  logger.error('Database initialization failed', { error: err.message, stack: err.stack });
   process.exit(1);
 });

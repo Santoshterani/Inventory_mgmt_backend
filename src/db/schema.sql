@@ -43,20 +43,44 @@ CREATE TABLE IF NOT EXISTS bases (
 -- user-creation permission (section 3.4) per account rather than globally.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-  id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name              VARCHAR(128) NOT NULL,
-  username          VARCHAR(64)  NOT NULL UNIQUE,
-  password_hash     VARCHAR(255) NOT NULL,
-  role_id           TINYINT UNSIGNED NOT NULL,
-  base_id           INT UNSIGNED NULL,
-  can_create_users  TINYINT(1)   NOT NULL DEFAULT 0,
-  is_active         TINYINT(1)   NOT NULL DEFAULT 1,
-  created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name                  VARCHAR(128) NOT NULL,
+  username              VARCHAR(64)  NOT NULL UNIQUE,
+  service_id            VARCHAR(64)  NOT NULL UNIQUE,
+  password_hash         VARCHAR(255) NOT NULL,
+  role_id               TINYINT UNSIGNED NOT NULL,
+  base_id               INT UNSIGNED NULL,
+  can_create_users      TINYINT(1)   NOT NULL DEFAULT 0,
+  -- Forces a password change on next sign-in. Set TRUE whenever an admin
+  -- issues a temporary password (new account or an admin-driven reset), so
+  -- "how does the user change the temporary password" has a real answer:
+  -- the frontend redirects to a mandatory change-password screen until
+  -- this flips back to FALSE (see FR-01 / the change-password endpoint).
+  must_change_password  TINYINT(1)   NOT NULL DEFAULT 1,
+  is_active             TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id),
   CONSTRAINT fk_users_base FOREIGN KEY (base_id) REFERENCES bases(id),
   INDEX idx_users_role (role_id),
   INDEX idx_users_base (base_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------------
+-- password_reset_tokens — backs the "Forgot password" flow. We store only a
+-- hash of the token (never the raw value), one-time use via `used_at`, and
+-- a short expiry. See services/auth.service.js.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id       INT UNSIGNED NOT NULL,
+  token_hash    VARCHAR(255) NOT NULL,
+  expires_at    DATETIME NOT NULL,
+  used_at       DATETIME NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_prt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_prt_user (user_id),
+  INDEX idx_prt_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------------

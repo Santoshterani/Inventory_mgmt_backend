@@ -61,8 +61,8 @@ async function list(user, { status, page = 1, pageSize = 10 }) {
   return { items: rows, total, bases, equipmentTypes };
 }
 
-async function getById(user, id) {
-  const [rows] = await pool.query(
+async function getById(user, id, executor = pool) {
+  const [rows] = await executor.query(
     `SELECT t.id, t.source_base_id AS sourceBaseId, sb.name AS sourceBaseName,
             t.destination_base_id AS destinationBaseId, db.name AS destinationBaseName,
             t.status, t.created_at AS createdAt, t.created_by AS createdBy, u.name AS createdByName
@@ -81,13 +81,13 @@ async function getById(user, id) {
     throw ApiError.forbidden();
   }
 
-  const [items] = await pool.query(
+  const [items] = await executor.query(
     `SELECT ti.id, ti.equipment_type_id AS equipmentTypeId, et.name AS equipmentTypeName, ti.quantity
      FROM transfer_items ti JOIN equipment_types et ON et.id = ti.equipment_type_id
      WHERE ti.transfer_id = ?`,
     [id]
   );
-  const [statusHistory] = await pool.query(
+  const [statusHistory] = await executor.query(
     `SELECT tsh.status, tsh.changed_at AS changedAt, u.name AS changedByName
      FROM transfer_status_history tsh JOIN users u ON u.id = tsh.changed_by
      WHERE tsh.transfer_id = ? ORDER BY tsh.changed_at ASC`,
@@ -161,7 +161,7 @@ async function create(user, { sourceBaseId, destinationBaseId, items }) {
       conn
     );
 
-    return getById(user, transferId);
+    return getById(user, transferId, conn);
   });
 }
 
@@ -241,7 +241,7 @@ async function changeStatus(user, id, nextStatus) {
       conn
     );
 
-    return getById(user, id);
+    return getById(user, id, conn);
   });
 }
 

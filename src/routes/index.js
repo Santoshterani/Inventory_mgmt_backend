@@ -10,6 +10,8 @@ router.use('/transfers', require('./transfers.routes'));
 router.use('/assignments', require('./assignments.routes'));
 router.use('/expenditures', require('./expenditures.routes'));
 router.use('/users', require('./users.routes'));
+router.use('/bases', require('./bases.routes'));
+router.use('/equipment-types', require('./equipmentTypes.routes'));
 router.use('/audit-logs', require('./audit.routes'));
 
 module.exports = router;

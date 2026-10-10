@@ -24,7 +24,8 @@ const authenticate = asyncHandler(async (req, res, next) => {
   }
 
   const [rows] = await pool.query(
-    `SELECT u.id, u.name, u.username, u.base_id AS baseId, u.can_create_users AS canCreateUsers,
+    `SELECT u.id, u.name, u.username, u.service_id AS serviceId, u.base_id AS baseId,
+            u.can_create_users AS canCreateUsers, u.must_change_password AS mustChangePassword,
             u.is_active AS isActive, r.code AS role, b.name AS baseName
      FROM users u
      JOIN roles r ON r.id = u.role_id
@@ -42,11 +43,23 @@ const authenticate = asyncHandler(async (req, res, next) => {
     id: user.id,
     name: user.name,
     username: user.username,
+    serviceId: user.serviceId,
     role: user.role,
     baseId: user.baseId,
     baseName: user.baseName,
     canCreateUsers: Boolean(user.canCreateUsers),
+    mustChangePassword: Boolean(user.mustChangePassword),
   };
+
+  // Defense in depth: even if the frontend's redirect were bypassed, the
+  // backend refuses everything except the auth endpoints themselves (me,
+  // logout, change-password) until a temporary password has been changed.
+  if (req.user.mustChangePassword && !req.originalUrl.startsWith('/api/auth/')) {
+    throw new ApiError(403, 'You must change your temporary password before continuing.', {
+      code: 'MUST_CHANGE_PASSWORD',
+    });
+  }
+
   next();
 });
 
